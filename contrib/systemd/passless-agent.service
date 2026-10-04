@@ -1,0 +1,79 @@
+# Passless Agent Daemon
+#
+# The daemon MUST run as root to create UHID endpoints and enforce principal
+# isolation (separate UIDs, namespaces, device policy). Do not change User/Group.
+#
+# This unit does NOT grant /dev/uhid or human hidraw access to principals.
+# Per-profile hidraw group policy is handled by 70-passless-agent.rules.
+#
+# Review hardening directives for your distribution before enabling.
+# Some directives may conflict with dynamic setuid/browser launch.
+
+[Unit]
+Description=Passless FIDO2 Agent Daemon
+Documentation=https://github.com/pando85/passless
+After=network-online.target systemd-logind.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/passless --verbose
+Restart=on-failure
+RestartSec=5s
+
+# The daemon requires root for UHID endpoint creation and principal isolation.
+# Do not add User= or Group= directives.
+
+# Filesystem
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/passless-agent /var/run/passless-agent /var/run/passless-browser
+PrivateTmp=true
+# Note: /var/run/passless-browser/<profile> directories are created per-profile
+# and owned by the configured browser_user. The daemon creates and cleans these
+# directories, so the parent must remain writable under ProtectSystem=strict.
+
+# Process
+NoNewPrivileges=false
+# Note: NoNewPrivileges=false is required because the daemon uses setuid to
+# launch principal and browser processes under separate Unix identities.
+
+# Namespaces / devices
+PrivateDevices=false
+# PrivateDevices cannot be enabled: Chromium enumerates dynamically created host
+# hidraw nodes after service startup, so static bind mounts are insufficient.
+# The daemon requires /dev/uhid; exact udev identity rules restrict each hidraw
+# node. Never grant /dev/uhid to principals or browser users.
+#
+# RestrictAddressFamilies is intentionally deferred. The restriction is inherited
+# by managed Chromium, which requires AF_INET/AF_INET6 for RP access and may use
+# AF_NETLINK for host network state. Add it only after the browser syscall/socket
+# surface is validated for the supported Chromium configurations.
+
+# Logging
+Environment=PASSLESS_SYSLOG_IDENTIFIER=passless-agent
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=passless-agent
+
+# Limits
+LimitMEMLOCK=64M
+LimitNOFILE=1024
+
+# Security: additive controls that do not interfere with cross-user setuid launch.
+ProtectHostname=true
+ProtectClock=true
+ProtectKernelLogs=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+
+# Higher-risk hardening remains deliberately deferred until it is profiled against
+# the root multi-principal browser path: CapabilityBoundingSet, SystemCallFilter,
+# RestrictNamespaces, ProtectProc/ProcSubset, and MemoryDenyWriteExecute.
+
+[Install]
+WantedBy=multi-user.target

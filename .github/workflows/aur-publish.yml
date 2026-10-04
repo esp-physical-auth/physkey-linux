@@ -16,13 +16,13 @@ jobs:
     strategy:
       matrix:
         package:
-          - name: passless-rs
+          - name: passless
             pkgbuild: PKGBUILD
-          - name: passless-rs-bin
+          - name: passless-bin
             pkgbuild: PKGBUILD-bin
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Extract crate information
         shell: bash
@@ -44,10 +44,12 @@ jobs:
           .ci/generate-pkgbuild.rh ${{ matrix.package.pkgbuild }}
 
       - name: Publish AUR package
-        uses: KSXGitHub/github-actions-deploy-aur@v4.1.1
+        uses: KSXGitHub/github-actions-deploy-aur@v4.2.0
         with:
           pkgname: ${{ matrix.package.name }}
           pkgbuild: ./${{ matrix.package.pkgbuild }}
+          assets: |
+            .ci/passless.install
           commit_username: ${{ secrets.AUR_USERNAME }}
           commit_email: ${{ secrets.AUR_EMAIL }}
           ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}

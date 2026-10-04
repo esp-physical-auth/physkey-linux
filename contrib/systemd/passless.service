@@ -1,0 +1,28 @@
+[Unit]
+Description=Passless FIDO2 Software Authenticator
+Documentation=https://github.com/pando85/passless
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:%h/.cargo/bin:%h/.local/bin
+ExecStart=passless
+Restart=on-failure
+RestartSec=5s
+
+# Security hardening
+# Do not impose NoNewPrivileges on the whole daemon process tree: trusted
+# same-user CDP port launches may need Chromium to establish its own sandbox
+# during exec. Principal and isolated browser children still apply
+# PR_SET_NO_NEW_PRIVS themselves before exec.
+NoNewPrivileges=false
+LimitMEMLOCK=2M
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=passless
+
+[Install]
+WantedBy=default.target

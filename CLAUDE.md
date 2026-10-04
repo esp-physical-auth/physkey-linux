@@ -9,7 +9,7 @@ Passless is a software FIDO2 authenticator emulator written in Rust. It creates 
 **Key characteristics:**
 - Uses the `keylib` crate for FIDO2/CTAP protocol implementation
 - Operates as a platform authenticator with resident key (passkey) support
-- Supports multiple storage backends: local filesystem and password-store (pass)
+- Supports multiple storage backends: local filesystem, password-store (pass), and TPM 2.0
 - Implements security hardening (mlock, core dump prevention)
 - Desktop notifications for user verification prompts
 
@@ -27,6 +27,13 @@ cargo build --release
 make release
 ```
 
+**Shell Completions:**
+Shell completions for bash, zsh, fish, and elvish are automatically generated during build time via `build.rs`. The completions are placed in `target/*/build/passless-rs-*/out/completions/` and are installed by the PKGBUILD to the appropriate system directories:
+- Bash: `/usr/share/bash-completion/completions/passless`
+- Zsh: `/usr/share/zsh/site-functions/_passless`
+- Fish: `/usr/share/fish/vendor_completions.d/passless.fish`
+- Elvish: `/usr/share/elvish/lib/passless.elv`
+
 ### Testing
 ```bash
 # Run unit tests
@@ -41,6 +48,7 @@ make test-e2e
 
 The E2E tests use environment variables:
 - `PASSLESS_E2E_AUTO_ACCEPT_UV=1` - Auto-accept user verification (debug builds only)
+- `PASSLESS_E2E_AUTO_ACCEPT_STORAGE=1` - Create test storage without initialization prompts (debug builds only)
 - `PASSLESS_LOCAL_PATH=/tmp/passless/fido2` - Use temporary storage
 
 ### Linting and Formatting
@@ -97,18 +105,32 @@ cargo run -- --verbose
 # With custom backend
 cargo run -- --backend-type pass
 cargo run -- --backend-type local --local-path /tmp/passless
+cargo run -- --backend-type tpm --tpm-tcti "device:/dev/tpmrm0"
+
+# With swtpm (software TPM for testing)
+cargo run -- --backend-type tpm --tpm-tcti "swtpm:path=$HOME/.local/run/swtpm-sock"
 ```
+
+**TPM Backend Setup:**
+For detailed TPM and swtpm setup instructions, see:
+- `docs/TPM_SETUP.md` - Comprehensive TPM setup guide
+- `docs/SWTPM_QUICK_START.md` - Quick swtpm reference
 
 ## Architecture
 
 ### Core Components
 
-**Main Loop** (`src/main.rs:22-86`):
+**Main Loop** (`cmd/passless/src/main.rs`):
 - Runs in `run_with_service()` function
 - Reads CTAPHID packets from UHID device in 64-byte chunks
 - Processes CBOR commands through `AuthenticatorService`
 - Sends response packets back through UHID
 - Periodically cleans up expired credential cache (every 5 seconds)
+- Implements graceful shutdown on Ctrl+C with 5-second timeout:
+  - Sets shutdown flag when Ctrl+C is received
+  - Spawns a timeout thread that forcefully exits after 5 seconds
+  - Performs final cache cleanup before normal exit
+  - If graceful shutdown takes longer than 5 seconds, process is forcefully terminated
 
 **AuthenticatorService** (`src/authenticator.rs`):
 - Orchestrates FIDO2 operations using dependency-injected `CredentialStorage`
@@ -125,18 +147,29 @@ cargo run -- --backend-type local --local-path /tmp/passless
 **Storage Implementations**:
 - `LocalStorageAdapter` (`src/storage/local.rs`): JSON files in local directory with in-memory caching
 - `PassStorageAdapter` (`src/storage/pass.rs`): Encrypted storage using password-store/GPG
+  - Automatic git sync: If the password-store has a git remote configured, changes are automatically synced
+  - Git pull on initialization: Ensures latest credentials are loaded
+  - Git commit + push on write/delete: Automatically commits with descriptive messages and pushes to remote
+  - Non-blocking: Git failures are logged as warnings and don't prevent credential operations
+- `TpmStorageAdapter` (`src/storage/tpm.rs`): TPM 2.0 hardware-backed storage
+  - Credentials sealed by TPM, can only be unsealed on the same machine
+  - Uses `tss-esapi` crate for TPM operations
+  - Supports hardware TPM and software TPM (swtpm) via TCTI configuration
+  - Stores sealed credentials as files with `.tpm` extension
+  - Uses owner hierarchy for sealing/unsealing operations
 
 **CTAP Command Handlers** (`src/commands/`):
 - `credential_mgmt.rs`: Implements credential management subcommands (enumerate, delete)
 - `custom.rs`: Wraps credential management as custom CTAP commands (0x0a standard, 0x41 Yubikey-compatible)
 - Commands use storage backend directly for operations
 
-**Configuration** (`src/config.rs`):
+**Configuration** (`src/config/mod.rs`):
 - `AppConfig`: Main config structure with backend selection
-- `BackendConfig`: Enum for Local vs Pass backend
+- `BackendConfig`: Enum for Local, Pass, or TPM backend
 - `SecurityConfig`: Memory locking, core dump prevention
 - CLI args merged with TOML config (CLI takes precedence)
 - Default config location: `~/.config/passless/config.toml`
+- TPM-specific config: TCTI string (e.g., `device:/dev/tpmrm0`, `swtpm:path=/path/to/socket`)
 
 **Security Hardening** (`src/config.rs:74-113`):
 - `mlockall()`: Locks all memory to prevent swapping credentials to disk
@@ -216,17 +249,56 @@ The authenticator is configured as a FIDO 2.1 platform authenticator with:
 
 Configuration can be set via environment variables:
 - `PASSLESS_CONFIG`: Path to config file
-- `PASSLESS_BACKEND_TYPE`: "local" or "pass"
+- `PASSLESS_BACKEND_TYPE`: "local", "pass", or "tpm"
 - `PASSLESS_LOCAL_PATH`: Local storage directory
 - `PASSLESS_PASS_STORE_PATH`: Password store path
 - `PASSLESS_PASS_PATH`: Relative path in password store (default: "fido2")
 - `PASSLESS_PASS_GPG_BACKEND`: "gpgme" or "gnupg-bin"
+- `PASSLESS_TPM_PATH`: TPM storage directory
+- `PASSLESS_TPM_TCTI`: TPM TCTI configuration (e.g., "device:/dev/tpmrm0", "swtpm:path=/path/to/socket")
 - `PASSLESS_USE_MLOCK`: Enable memory locking (default: true)
 - `PASSLESS_DISABLE_CORE_DUMPS`: Disable core dumps (default: true)
 - `PASSLESS_NO_NEW_PRIVS`: Set no new privileges (default: true)
 - `PASSLESS_LOG_LEVEL`: Log level filter
 - `PASSLESS_LOG_STYLE`: Log style
 - `PASSLESS_E2E_AUTO_ACCEPT_UV`: Auto-accept UV in E2E tests (debug only)
+
+**Formatting Rules:**
+- Imports from different crate paths must be on separate lines
+- Imports from the same crate path (same submodule) must be grouped with braces
+- Each import line must end with a semicolon
+
+**Correct Example:**
+```rust
+use super::SomeType;
+
+use crate::error::Error;
+use crate::pin_token::{Permission, PinToken, PinTokenManager};
+
+use soft_fido2_crypto::{ecdsa, pin_protocol};
+
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+
+use ciborium::cbor;
+use serde::Serialize;
+```
+
+**Incorrect Examples:**
+```rust
+// ❌ Wrong: combining different submodules with braces
+use std::{collections::HashMap, sync::{Arc, Mutex}};
+
+// ❌ Wrong: not grouping same submodule imports
+use crate::pin_token::Permission;
+use crate::pin_token::PinToken;
+use crate::pin_token::PinTokenManager;
+
+// ❌ Wrong: imports not in correct order
+use serde::Serialize;
+use crate::error::Error;
+use std::sync::Arc;
+```
 
 ## CI/CD
 
@@ -241,3 +313,77 @@ Release process:
 2. Run `make update-changelog` to generate changelog
 3. Tag with `v*` pattern
 4. CI builds, runs tests, publishes to crates.io, creates GitHub release
+
+## Documentation Guidelines
+
+### README Files
+
+Keep README files concise and focused on basic examples only:
+- **DO**: Provide simple, working examples
+- **DO**: Show the most common use cases
+- **DO**: Keep explanations brief and to the point
+- **DON'T**: Create lengthy, comprehensive documentation
+- **DON'T**: Duplicate information already in other docs
+- **DON'T**: Recreate README files that have been intentionally deleted
+
+Examples of good README content:
+- Quick installation command
+- Basic usage example
+- Link to more detailed documentation if needed
+
+For detailed documentation, use dedicated files like INSTALL.md, CONTRIBUTING.md, etc.
+
+## Commit Message Guidelines
+
+This project uses **Conventional Commits** enforced by commitlint.
+
+### Format
+
+```
+<type>: <subject>
+
+<body>
+
+<footer>
+```
+
+### Rules
+
+- **Type**: Required, must be one of:
+  - `feat`: New feature
+  - `fix`: Bug fix
+  - `refactor`: Code refactoring (no functional changes)
+  - `docs`: Documentation changes
+  - `style`: Code style changes (formatting, etc.)
+  - `test`: Adding or updating tests
+  - `chore`: Maintenance tasks
+  - `build`: Build system changes
+  - `ci`: CI/CD pipeline changes
+  - `revert`: Reverting a previous commit
+  - `release`: Release-related commits
+
+- **Subject**:
+  - Use sentence-case or lower-case (NOT Title Case)
+  - Don't end with a period
+  - Keep it concise and descriptive
+
+- **Body** (optional):
+  - Must have a blank line before it
+  - Explain what and why, not how
+  - Use present tense
+
+- **Footer** (optional):
+  - Must have a blank line before it
+  - Use for breaking changes (`BREAKING CHANGE:`) or issue references
+
+### Examples
+
+```
+feat: add TOML config file support
+
+refactor: flatten config structure for better TOML serialization
+
+fix: resolve clippy warnings in storage module
+
+docs: update installation guide with systemd service
+```

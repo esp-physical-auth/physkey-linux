@@ -9,6 +9,7 @@
       [
         "build",
         "chore",
+        "ci",
         "docs",
         "feat",
         "fix",
@@ -19,14 +20,7 @@
         "test"
       ]
     ],
-    "subject-case": [
-      2,
-      "always",
-      [
-        "sentence-case",
-        "lower-case"
-      ]
-    ],
+    "subject-case": [0],
     "body-leading-blank": [
       2,
       "always"
