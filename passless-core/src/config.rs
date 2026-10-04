@@ -48,6 +48,38 @@ pub struct LocalBackendConfig {
     pub path: String,
 }
 
+/// ESP32 backend configuration (WebAuthn over BLE Nordic UART Service)
+#[derive(ClapSerde, Debug, Clone, Serialize, Deserialize, ConfigDoc)]
+#[group(id = "esp32-backend-config")]
+pub struct Esp32BackendConfig {
+    /// ESP32 BLE device name to connect to
+    #[arg(
+        long = "esp32-device-name",
+        env = "PASSLESS_ESP32_DEVICE_NAME",
+        id = "esp32-device-name",
+        value_name = "NAME"
+    )]
+    #[serde(default)]
+    #[default(None::<String>)]
+    pub device_name: Option<String>,
+
+    /// CA 公钥（P-256 未压缩点 base64，65 字节），用于验证设备证书与挑战响应。
+    /// 留空则使用内置默认值（与 web/totp.html 中 CA_PUBKEY_B64 一致）。
+    #[arg(
+        long = "esp32-ca-pubkey",
+        env = "PASSLESS_ESP32_CA_PUBKEY",
+        id = "esp32-ca-pubkey",
+        value_name = "B64"
+    )]
+    #[serde(default)]
+    #[default(None::<String>)]
+    pub ca_pubkey: Option<String>,
+}
+
+/// 内置默认 CA 公钥（与 tools/atri-ca.py 生成、web/totp.html 内置的同一条）。
+pub const DEFAULT_ESP32_CA_PUBKEY_B64: &str =
+    "BO+1Mjj2ZeglAd76ArgCaujE0FdBr+TURI6nlaMaAYAN7pZN04F3yhqzxGhDalco5cGMqSdVtgUT9Tu4iFbG9Q0=";
+
 /// Compute default password-store path
 pub fn pass_store_path() -> String {
     dirs::home_dir()
@@ -417,10 +449,10 @@ impl SecurityConfig {
 /// Note: Cannot derive Clone/Debug because it has #[clap_serde] fields
 #[derive(ClapSerde, Serialize, Deserialize, Debug, ConfigDoc)]
 pub struct AppConfig {
-    /// Storage backend type: pass, tpm (experimental), or local (for testing)
+    /// Storage backend type: pass, esp32, tpm (experimental), or local (for testing)
     #[arg(short = 't', long = "backend-type", env = "PASSLESS_BACKEND_TYPE")]
     #[serde(default)]
-    #[default("pass".to_string())]
+    #[default("esp32".to_string())]
     pub backend_type: String,
 
     /// Enable verbose logging
@@ -457,6 +489,12 @@ pub struct AppConfig {
     #[command(flatten)]
     pub local: LocalBackendConfig,
 
+    /// ESP32 backend configuration
+    #[clap_serde]
+    #[serde(default)]
+    #[command(flatten)]
+    pub esp32: Esp32BackendConfig,
+
     /// Security hardening configuration
     #[clap_serde]
     #[serde(default)]
@@ -491,6 +529,10 @@ pub enum BackendConfig {
         path: String,
         tcti: String,
         portable: bool,
+    },
+    /// ESP32-C5 硬件后端：密钥生成/签名经 BLE(NUS) 转发给设备。
+    Esp32 {
+        device_name: Option<String>,
     },
 }
 
@@ -543,6 +585,7 @@ impl BackendConfig {
             } => Self::canonicalize_path(&Path::new(store_path).join(path)),
             #[cfg(feature = "tpm")]
             BackendConfig::Tpm { path, .. } => Self::canonicalize_path(Path::new(path)),
+            BackendConfig::Esp32 { .. } => Self::canonicalize_path(Path::new(&crate::config::local_path())),
         }
     }
 
@@ -557,6 +600,9 @@ impl BackendConfig {
             }
             #[cfg(feature = "tpm")]
             BackendConfig::Tpm { path, .. } => path.clone(),
+            BackendConfig::Esp32 { device_name } => {
+                format!("esp32:{}", device_name.as_deref().unwrap_or("ATRI-TOTP"))
+            }
         }
     }
 
@@ -609,6 +655,7 @@ impl BackendConfig {
                 }
                 Ok(())
             }
+            BackendConfig::Esp32 { .. } => Ok(()),
         }
     }
 }
@@ -686,23 +733,12 @@ impl AppConfig {
     /// Get the backend configuration based on the backend_type
     pub fn backend(&self) -> crate::error::Result<BackendConfig> {
         match self.backend_type.as_str() {
-            "local" => Ok(BackendConfig::Local {
-                path: self.local.path.clone(),
+            // 本构建仅支持 ESP32 硬件后端，其余后端已屏蔽。
+            "esp32" => Ok(BackendConfig::Esp32 {
+                device_name: self.esp32.device_name.clone(),
             }),
-            "pass" => Ok(BackendConfig::Pass {
-                store_path: self.pass.store_path.clone(),
-                path: self.pass.path.clone(),
-                gpg_backend: self.pass.gpg_backend.clone(),
-            }),
-            #[cfg(feature = "tpm")]
-            "tpm" => Ok(BackendConfig::Tpm {
-                path: self.tpm.path.clone(),
-                tcti: self.tpm.tcti.clone(),
-                portable: self.tpm.portable,
-            }),
-            _ => Err(crate::error::Error::Config(format!(
-                "Invalid backend_type '{}'. Must be one of: local, pass, tpm",
-                self.backend_type
+            other => Err(crate::error::Error::Config(format!(
+                "backend_type '{other}' is disabled in this build; only 'esp32' is supported"
             ))),
         }
     }

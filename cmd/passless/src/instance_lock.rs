@@ -186,6 +186,7 @@ impl InstanceLock {
                 BackendConfig::Pass { .. } => "pass",
                 #[cfg(feature = "tpm")]
                 BackendConfig::Tpm { .. } => "tpm",
+                BackendConfig::Esp32 { .. } => "esp32",
             },
             backend.state_path().display()
         );

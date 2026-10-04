@@ -3,6 +3,7 @@ pub mod agent;
 mod authenticator;
 mod commands;
 mod credential_backup;
+mod esp32;
 mod instance_lock;
 mod logging;
 mod notification;
@@ -592,6 +593,80 @@ fn run() -> Result<()> {
                     let _ = endpoint_manager.shutdown_all(None);
                     result
                 }
+                BackendConfig::Esp32 { device_name } => {
+                    // ESP32 硬件后端：私钥永不导出，签名在设备上完成。
+                    // 浏览器仍通过 UHID 看到虚拟安全密钥；CTAP2 编解码在本地，
+                    // 密钥生成/签名经由 BLE 转发给 ESP32-C5。
+                    // 存储后端用本地目录（凭证的公开元信息仍缓存在本地）。
+                    let storage = LocalStorageAdapter::new_with_options(
+                        passless_core::config::local_path().into(),
+                        allow_storage_creation,
+                    )?;
+                    let boxed: Box<dyn CredentialStorage> = Box::new(storage);
+                    let shared_storage = Arc::new(Mutex::new(boxed));
+                    let pin_storage_inner = LocalPinStorage::new(
+                        passless_core::config::local_path().into(),
+                    );
+                    let boxed_pin: Box<dyn crate::pin_storage::PinStorage> =
+                        Box::new(pin_storage_inner);
+                    let pin_storage = Arc::new(Mutex::new(boxed_pin));
+
+                    // 每次需要解锁时弹窗输入 ESP32 密码。
+                    // 优先用图形弹窗（zenity），无图形会话时回退到终端输入。
+                    let prompt: Box<dyn Fn() -> Result<String, String> + Send + Sync> =
+                        Box::new(|| {
+                            if let Ok(out) = std::process::Command::new("zenity")
+                                .args([
+                                    "--password",
+                                    "--title=ESP32 设备解锁",
+                                    "--timeout=60",
+                                ])
+                                .output()
+                            {
+                                if out.status.success() {
+                                    return Ok(String::from_utf8_lossy(&out.stdout)
+                                        .trim_end()
+                                        .to_string());
+                                }
+                                // zenity 可用但用户取消/超时
+                                return Err("用户取消或超时".to_string());
+                            }
+                            // 无图形环境：回退终端输入
+                            rpassword::prompt_password("ESP32 设备密码 (AUTHPASS): ")
+                                .map_err(|e| format!("读取密码失败: {e}"))
+                        });
+                    let provider = esp32::Esp32CredentialKeyProvider::new(
+                        device_name,
+                        Some(prompt),
+                    )
+                    .map_err(Error::Other)?;
+
+                    let service = AuthenticatorService::with_shared_storage_and_key_provider(
+                        shared_storage.clone(),
+                        Some(pin_storage.clone()),
+                        provider,
+                        security_config.clone(),
+                        pin_config.clone(),
+                    )?;
+
+                    // agent 运行时暂不支持 ESP32 provider，保持纯软件后端
+                    let agent_runtime = spawn_agent_runtime(
+                        shared_storage.clone(),
+                        pin_storage.clone(),
+                        operation_lock.clone(),
+                        Arc::new(SoftwareCredentialKeyProvider),
+                        config.agents.clone(),
+                        security_config,
+                        pin_config,
+                        shutdown.clone(),
+                    );
+
+                    let result = run_with_service_and_lock(service, uhid, shutdown, operation_lock);
+                    join_agent_runtime(agent_runtime);
+                    endpoint_manager.cancel_all();
+                    let _ = endpoint_manager.shutdown_all(None);
+                    result
+                }
                 BackendConfig::Pass {
                     store_path,
                     path,
@@ -800,6 +875,53 @@ fn run() -> Result<()> {
                 let service = AuthenticatorService::with_pin_storage(
                     storage,
                     Some(pin_storage),
+                    security_config,
+                    pin_config,
+                )?;
+                run_with_service(service, uhid, shutdown)
+            }
+            BackendConfig::Esp32 { device_name } => {
+                let pin_storage = LocalPinStorage::new(
+                    passless_core::config::local_path().into(),
+                );
+                let pin_storage = Arc::new(Mutex::new(pin_storage));
+                // 每次需要解锁时弹窗输入 ESP32 密码。
+                // 优先用图形弹窗（zenity），无图形会话时回退到终端输入。
+                let prompt: Box<dyn Fn() -> std::result::Result<String, String> + Send + Sync> =
+                    Box::new(|| {
+                        if let Ok(out) = std::process::Command::new("zenity")
+                            .args([
+                                "--password",
+                                "--title=ESP32 设备解锁",
+                                "--timeout=60",
+                            ])
+                            .output()
+                        {
+                            if out.status.success() {
+                                return Ok(String::from_utf8_lossy(&out.stdout)
+                                    .trim_end()
+                                    .to_string());
+                            }
+                            return Err("用户取消或超时".to_string());
+                        }
+                        rpassword::prompt_password("ESP32 设备密码 (AUTHPASS): ")
+                            .map_err(|e| format!("读取密码失败: {e}"))
+                    });
+                // 方案 A1：凭证不落盘，storage 与 provider 共享同一条 BLE 连接。
+                let shared = esp32::Esp32Link::new_with_ca(
+                    device_name,
+                    Some(prompt),
+                    config.esp32.ca_pubkey.clone(),
+                )
+                .map_err(Error::Other)?;
+                let storage = storage::Esp32StorageAdapter::new(shared.clone());
+                let storage_boxed: Box<dyn CredentialStorage> = Box::new(storage);
+                let storage_arc = Arc::new(Mutex::new(storage_boxed));
+                let provider = esp32::Esp32CredentialKeyProvider::with_shared(shared);
+                let service = AuthenticatorService::with_shared_storage_and_key_provider(
+                    storage_arc,
+                    Some(pin_storage),
+                    provider,
                     security_config,
                     pin_config,
                 )?;

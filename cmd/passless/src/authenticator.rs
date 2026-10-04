@@ -947,7 +947,6 @@ impl<
     K: CredentialKeyProvider + Send + Sync + 'static,
 > AuthenticatorService<S, P, K>
 {
-    #[cfg(feature = "tpm")]
     fn build_authenticator_with_key_provider(
         storage: Arc<Mutex<S>>,
         pin_storage: Option<Arc<Mutex<P>>>,
@@ -1140,7 +1139,6 @@ impl<
     }
 
     /// Create a new authenticator service with optional PIN storage and a custom key provider
-    #[cfg(feature = "tpm")]
     pub fn with_pin_storage_and_key_provider(
         storage: S,
         pin_storage: Option<Arc<Mutex<P>>>,
@@ -1159,7 +1157,6 @@ impl<
     }
 
     /// Create a new authenticator service with shared (Arc-wrapped) storage and a custom key provider
-    #[cfg(feature = "tpm")]
     pub fn with_shared_storage_and_key_provider(
         storage: Arc<Mutex<S>>,
         pin_storage: Option<Arc<Mutex<P>>>,

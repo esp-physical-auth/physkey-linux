@@ -76,14 +76,27 @@ impl LocalStorageAdapter {
     fn save_credential(&mut self, cred: &soft_fido2::Credential) -> Result<()> {
         let our_cred = Credential::from_soft_fido2(cred);
 
-        let rp_id = validate_rp_id_for_storage(cred.rp.id.as_str())
-            .map_err(|_| soft_fido2::Error::Other)?;
+        let rp_id = validate_rp_id_for_storage(cred.rp.id.as_str()).map_err(|e| {
+            error!(
+                "save_credential: invalid RP ID '{}': {:?}",
+                cred.rp.id, e
+            );
+            soft_fido2::Error::Other
+        })?;
 
         let path_info = CredentialPathInfo::new(rp_id, cred.id.clone(), "bin".to_string());
 
         let path = path_info.to_path(&self.storage_dir);
+        debug!("save_credential: target path = {}", path.display());
 
-        let parent = path.parent().ok_or(soft_fido2::Error::Other)?;
+        let parent = path.parent().ok_or_else(|| {
+            error!(
+                "save_credential: path has no parent (storage_dir={}): {}",
+                self.storage_dir.display(),
+                path.display()
+            );
+            soft_fido2::Error::Other
+        })?;
         create_secure_dir_all(parent).map_err(|e| {
             error!(
                 "Failed to create credential directory {}: {}",
@@ -93,14 +106,31 @@ impl LocalStorageAdapter {
             soft_fido2::Error::Other
         })?;
 
-        let bytes = Zeroizing::new(our_cred.to_bytes()?);
+        let bytes = Zeroizing::new(our_cred.to_bytes().map_err(|e| {
+            error!(
+                "save_credential: serialize credential failed (rp={}, id_len={}): {:?}",
+                cred.rp.id,
+                cred.id.len(),
+                e
+            );
+            soft_fido2::Error::Other
+        })?);
+        debug!("save_credential: serialized {} bytes", bytes.len());
 
         let filename = path
             .file_name()
             .and_then(|n| n.to_str())
-            .ok_or(soft_fido2::Error::Other)?;
+            .ok_or_else(|| {
+                error!("save_credential: path has no valid filename: {}", path.display());
+                soft_fido2::Error::Other
+            })?;
         atomic_write_in_dir(parent, filename, &bytes).map_err(|e| {
-            error!("Failed to persist credential {}: {}", path.display(), e);
+            error!(
+                "Failed to persist credential {} (dir={}): {}",
+                path.display(),
+                parent.display(),
+                e
+            );
             soft_fido2::Error::Other
         })?;
 

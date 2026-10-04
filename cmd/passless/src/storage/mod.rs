@@ -3,6 +3,7 @@
 //! This module provides storage backends for FIDO2 credentials.
 
 pub mod credential;
+pub mod esp32;
 pub mod index;
 pub mod local;
 pub mod pass;
@@ -14,6 +15,7 @@ pub mod tpm;
 // Internal credential type with controlled serialization
 #[allow(unused_imports)]
 pub(crate) use credential::Credential;
+pub use esp32::Esp32StorageAdapter;
 pub use local::LocalStorageAdapter;
 pub use pass_refresh::PassStorageAdapter;
 pub use rp_id::ValidatedRpId;
