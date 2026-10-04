@@ -1,5 +1,8 @@
 name: Auto tag
 
+permissions:
+  contents: write
+
 on:
   push:
     branches:
@@ -11,7 +14,6 @@ jobs:
     steps:
       - name: Checkout repository
         with:
-          token: ${{ secrets.PAT }}
           fetch-depth: 0
         uses: actions/checkout@v7
 
@@ -32,18 +34,11 @@ jobs:
             echo "TAG_EXISTS=false" >> $GITHUB_ENV
           fi
 
-      - name: Import GPG key
-        if: env.TAG_EXISTS == 'false'
-        env:
-          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-        run: |
-          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
-
       - name: Create new tag
         if: env.TAG_EXISTS == 'false'
         run: |
           tag=${{ steps.changelog_reader.outputs.version }}
           git config --global user.name "${{ github.actor }}"
           git config --global user.email "${{ github.actor }}@users.noreply.github.com"
-          git tag -s "$tag" -m "$tag" --local-user $(gpg --list-keys --with-colons | grep '^pub' | cut -d':' -f5)
+          git tag "$tag" -m "$tag"
           git push origin "$tag"
