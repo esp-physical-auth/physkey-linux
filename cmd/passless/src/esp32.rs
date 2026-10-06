@@ -80,8 +80,13 @@ pub struct Esp32Link {
     /// 启动时输过一次密码并解锁成功后置 true。
     /// 之后所有需要解锁的操作都直接复用，不再弹窗（"启动输一次，自动批准"）。
     unlocked: Mutex<bool>,
-    /// CA 公钥（P-256 未压缩点 base64，65 字节），用于信任链校验。
+    /// 根 CA 公钥（P-256 未压缩点 base64，65 字节），用于信任链校验。
     ca_pubkey_b64: String,
+    /// 部署标识确认回调（对齐 web/authnkey 的“这是你自己部署的设备吗”弹窗）。
+    /// 返回 true = 用户确认；false/None = 拒绝（断开连接）。
+    deploy_prompt: Mutex<Option<Box<dyn Fn(&str) -> bool + Send + Sync>>>,
+    /// 最近一次验签通过的部署标识（内嵌于证书），供上层 UI 提示确认。
+    deployment_id: Mutex<Option<String>>,
 }
 
 impl Esp32Link {
@@ -97,6 +102,15 @@ impl Esp32Link {
         pass_prompt: Option<Box<dyn Fn() -> Result<String, String> + Send + Sync>>,
         ca_pubkey_b64: Option<String>,
     ) -> Result<Arc<Self>, String> {
+        Self::new_full(device_name, pass_prompt, ca_pubkey_b64, None)
+    }
+
+    pub fn new_full(
+        device_name: Option<String>,
+        pass_prompt: Option<Box<dyn Fn() -> Result<String, String> + Send + Sync>>,
+        ca_pubkey_b64: Option<String>,
+        deploy_prompt: Option<Box<dyn Fn(&str) -> bool + Send + Sync>>,
+    ) -> Result<Arc<Self>, String> {
         let rt = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .worker_threads(1)
@@ -111,6 +125,8 @@ impl Esp32Link {
             ca_pubkey_b64: ca_pubkey_b64
                 .filter(|s| !s.is_empty())
                 .unwrap_or_else(|| passless_core::config::DEFAULT_ESP32_CA_PUBKEY_B64.to_string()),
+            deploy_prompt: Mutex::new(deploy_prompt),
+            deployment_id: Mutex::new(None),
         }))
     }
 
@@ -140,9 +156,12 @@ impl Esp32Link {
         Ok(link)
     }
 
-    /// 信任链校验（对齐 web/totp.html）：
-    ///   1. GETCERT 取设备证书，用 CA 公钥验签 payload（确认设备公钥由本 CA 签发）
+    /// 信任链校验（SSL/TLS 式三级链，全程离线，对齐 web/totp.html）：
+    ///   1. GETCERT 取设备证书链，用【内置根 CA 公钥】验签：
+    ///      两段链：根CA公钥→验中间CA证书→取中间CA公钥→验设备证书
+    ///      单段：直接用内置根 CA 公钥验设备证书
     ///   2. AUTH <nonce> 让设备用私钥签名随机数，用设备公钥验签（确认持有私钥）
+    ///   3. 打印/日志展示部署标识，供上层 UI 提示用户确认
     fn verify_device(&self, link: &BleLink) -> Result<(), CredentialKeyError> {
         use p256::ecdsa::{signature::Verifier as _, Signature as EcSig, VerifyingKey};
 
@@ -158,46 +177,103 @@ impl Esp32Link {
                 "设备未安装证书（需先用电脑 CA 签发 SETCERT）".to_string(),
             ))?
             .trim();
-        let cert = base64::engine::general_purpose::STANDARD
-            .decode(cert_b64)
-            .map_err(|e| CredentialKeyError::PermanentFailure(format!("证书 b64 解码失败: {e}")))?;
-        // 证书格式：len(2) || payload || siglen(2) || sig(64)
-        if cert.len() < 4 {
-            return Err(CredentialKeyError::PermanentFailure("证书过短".into()));
-        }
-        let plen = ((cert[0] as usize) << 8) | cert[1] as usize;
-        if cert.len() < 2 + plen + 2 {
-            return Err(CredentialKeyError::PermanentFailure("证书 payload 长度越界".into()));
-        }
-        let payload = &cert[2..2 + plen];
-        let slen = ((cert[2 + plen] as usize) << 8) | cert[3 + plen] as usize;
-        if cert.len() < 4 + plen + slen {
-            return Err(CredentialKeyError::PermanentFailure("证书签名长度越界".into()));
-        }
-        let sig = &cert[4 + plen..4 + plen + slen];
-        if payload.len() < 66 {
+
+        // GETCERT 可能返回两段：“设备证书|中间CA证书”（三级链）。
+        // 必须【先按 '|' 拆段】再逐段 base64 解码（不能整串解码，否则 '|' 非法）。
+        let parts: Vec<&str> = cert_b64.split('|').filter(|s| !s.is_empty()).collect();
+        let device_cert = base64::engine::general_purpose::STANDARD
+            .decode(parts[0])
+            .map_err(|e| CredentialKeyError::PermanentFailure(format!("设备证书 b64 解码失败: {e}")))?;
+        let user_ca_cert: Option<Vec<u8>> = if parts.len() >= 2 {
+            Some(
+                base64::engine::general_purpose::STANDARD
+                    .decode(parts[1])
+                    .map_err(|e| CredentialKeyError::PermanentFailure(format!("中间 CA 证书 b64 解码失败: {e}")))?,
+            )
+        } else {
+            None
+        };
+
+        // 拆设备证书（len(2)||payload||slen(2)||sig）
+        let (payload, sig) = split_cert(&device_cert)
+            .ok_or_else(|| CredentialKeyError::PermanentFailure("设备证书长度越界".into()))?;
+
+        // 解析 payload（兼容 0x01/0x02），取出 deployment_id 与设备公钥
+        let (deployment_id, pub_off) = parse_cert_payload(payload)
+            .ok_or_else(|| CredentialKeyError::PermanentFailure("证书 payload 格式异常".into()))?;
+        if payload.len() < pub_off + 81 {
             return Err(CredentialKeyError::PermanentFailure("证书 payload 异常".into()));
         }
-        let device_pub = &payload[1..66]; // 0x04||X||Y
+        let device_pub = &payload[pub_off..pub_off + 65]; // 0x04||X||Y
 
-        // 用 CA 公钥验签 payload（DER 编码签名）
-        let ca_raw = base64::engine::general_purpose::STANDARD
-            .decode(&self.ca_pubkey_b64)
-            .map_err(|e| CredentialKeyError::PermanentFailure(format!("CA 公钥 b64 解码失败: {e}")))?;
-        if ca_raw.len() < 65 || ca_raw[0] != 0x04 {
-            return Err(CredentialKeyError::PermanentFailure("CA 公钥格式异常".into()));
+        // 选验证公钥（全程离线，仅用内置根 CA 公钥）：
+        //   - 两段链：根CA公钥→验中间CA证书→取中间CA公钥
+        //   - 单段：直接用内置根 CA 公钥
+        let verify_pub_raw: Vec<u8> = if let Some(uca) = &user_ca_cert {
+            // 1) 用根 CA 公钥验中间 CA 证书
+            let root_raw = base64::engine::general_purpose::STANDARD
+                .decode(&self.ca_pubkey_b64)
+                .map_err(|e| CredentialKeyError::PermanentFailure(format!("根 CA 公钥 b64 解码失败: {e}")))?;
+            if root_raw.len() < 65 || root_raw[0] != 0x04 {
+                return Err(CredentialKeyError::PermanentFailure("根 CA 公钥格式异常".into()));
+            }
+            let root_key = VerifyingKey::from_sec1_bytes(&root_raw[..65])
+                .map_err(|e| CredentialKeyError::PermanentFailure(format!("根 CA 公钥无效: {e}")))?;
+            let (uca_payload, uca_sig) = split_cert(uca)
+                .ok_or_else(|| CredentialKeyError::PermanentFailure("中间 CA 证书长度越界".into()))?;
+            let uca_sig_obj = EcSig::from_slice(uca_sig)
+                .map_err(|e| CredentialKeyError::PermanentFailure(format!("中间 CA 证书签名解析失败: {e}")))?;
+            root_key.verify(uca_payload, &uca_sig_obj).map_err(|_| {
+                CredentialKeyError::PermanentFailure("中间 CA 证书验签失败：非本根 CA 签发".into())
+            })?;
+            let (uca_id, uca_pub_off) = parse_cert_payload(uca_payload).ok_or_else(|| {
+                CredentialKeyError::PermanentFailure("中间 CA 证书 payload 异常".into())
+            })?;
+            if uca_payload.len() < uca_pub_off + 65 {
+                return Err(CredentialKeyError::PermanentFailure("中间 CA 证书 payload 异常".into()));
+            }
+            let user_ca_pub = uca_payload[uca_pub_off..uca_pub_off + 65].to_vec();
+            info!("[esp32] 中间 CA 证书验签通过（根 CA 可信），用户标识='{uca_id}'");
+            user_ca_pub
+        } else {
+            base64::engine::general_purpose::STANDARD
+                .decode(&self.ca_pubkey_b64)
+                .map_err(|e| CredentialKeyError::PermanentFailure(format!("根 CA 公钥 b64 解码失败: {e}")))?
+        };
+
+        if verify_pub_raw.len() < 65 || verify_pub_raw[0] != 0x04 {
+            return Err(CredentialKeyError::PermanentFailure("验证公钥格式异常".into()));
         }
-        let ca_key = VerifyingKey::from_sec1_bytes(&ca_raw[..65])
-            .map_err(|e| CredentialKeyError::PermanentFailure(format!("CA 公钥无效: {e}")))?;
-        // ESP32 签名是 raw r||s（P1363）格式，p256 的 Signature::from_slice 接受 raw。
+        let verify_key = VerifyingKey::from_sec1_bytes(&verify_pub_raw[..65])
+            .map_err(|e| CredentialKeyError::PermanentFailure(format!("验证公钥无效: {e}")))?;
+        // ESP32 签名是 raw r||s（P1363），p256 的 Signature::from_slice 接受 raw。
         let ca_sig = EcSig::from_slice(sig)
             .map_err(|e| CredentialKeyError::PermanentFailure(format!("证书签名解析失败: {e}")))?;
-        ca_key
+        verify_key
             .verify(payload, &ca_sig)
             .map_err(|_| CredentialKeyError::PermanentFailure(
-                "设备证书验签失败：非本 CA 签发（可能被伪造/中间人）".into(),
+                "设备证书验签失败：非可信 CA 签发（可能被伪造/中间人）".into(),
             ))?;
-        info!("[esp32] 设备证书验签通过（CA 可信）");
+        info!("[esp32] 设备证书验签通过，部署标识='{deployment_id}'");
+        // 供上层 UI 提示用户确认设备归属
+        *self.deployment_id.lock().unwrap() = Some(deployment_id.clone());
+
+        // 1.5) 部署标识确认（对齐 web/authnkey：\"这是你自己部署的设备吗\"）
+        //      在挑战-响应之前询问，拒绝则不继续。回调可能阻塞（弹窗），故
+        //      先释放 deployment_id 锁再调用。
+        let confirmed = {
+            let cb = self.deploy_prompt.lock().unwrap();
+            match cb.as_ref() {
+                Some(f) => f(&deployment_id),
+                None => true, // 未提供回调：不弹窗（非交互场景），仅日志
+            }
+        };
+        if !confirmed {
+            warn!("[esp32] 用户拒绝确认部署标识 '{deployment_id}'，断开连接");
+            return Err(CredentialKeyError::PermanentFailure(
+                "用户未确认设备归属（部署标识），已拒绝连接".into(),
+            ));
+        }
 
         // 2) 挑战-响应
         let mut nonce = [0u8; 32];
@@ -571,6 +647,16 @@ impl Esp32CredentialKeyProvider {
         Ok(Self { shared })
     }
 
+    /// 创建 provider（带部署标识确认回调）。
+    pub fn new_with_deploy_prompt(
+        device_name: Option<String>,
+        pass_prompt: Option<Box<dyn Fn() -> Result<String, String> + Send + Sync>>,
+        deploy_prompt: Option<Box<dyn Fn(&str) -> bool + Send + Sync>>,
+    ) -> Result<Self, String> {
+        let shared = Esp32Link::new_full(device_name, pass_prompt, None, deploy_prompt)?;
+        Ok(Self { shared })
+    }
+
     /// 用已有的共享连接创建 provider（与 storage 复用）。
     pub fn with_shared(shared: Arc<Esp32Link>) -> Self {
         Self { shared }
@@ -751,6 +837,48 @@ impl CredentialKeyProvider for Esp32CredentialKeyProvider {
 
 // ---- 信任链校验辅助 ----
 
+/// 拆分证书：len(2) || payload || slen(2) || sig(64)，返回 (payload, sig)。
+fn split_cert(cert: &[u8]) -> Option<(&[u8], &[u8])> {
+    if cert.len() < 4 {
+        return None;
+    }
+    let plen = ((cert[0] as usize) << 8) | cert[1] as usize;
+    if cert.len() < 2 + plen + 2 {
+        return None;
+    }
+    let payload = &cert[2..2 + plen];
+    let slen = ((cert[2 + plen] as usize) << 8) | cert[3 + plen] as usize;
+    if cert.len() < 4 + plen + slen {
+        return None;
+    }
+    let sig = &cert[4 + plen..4 + plen + slen];
+    Some((payload, sig))
+}
+
+/// 解析证书 payload（兼容 0x01/0x02/0x10），返回 (deployment_id, subject_pub 偏移)。
+///   0x02/0x10 || id_len(1) || deployment_id(id_len) || pub(65) || issue_time(8) || serial(8)
+///   0x01 || pub(65) || issue_time(8) || serial(8)
+fn parse_cert_payload(payload: &[u8]) -> Option<(String, usize)> {
+    if payload.is_empty() {
+        return None;
+    }
+    match payload[0] {
+        0x02 | 0x10 => {
+            if payload.len() < 2 {
+                return None;
+            }
+            let id_len = payload[1] as usize;
+            if payload.len() < 2 + id_len + 81 {
+                return None;
+            }
+            let id = String::from_utf8_lossy(&payload[2..2 + id_len]).to_string();
+            Some((id, 2 + id_len))
+        }
+        0x01 => Some((String::new(), 1)),
+        _ => None,
+    }
+}
+
 /// 填充随机字节（用于挑战 nonce）。
 fn getrandom_fill(buf: &mut [u8]) {
     use rand::RngCore as _;
@@ -766,5 +894,27 @@ mod tests {
         let b = [0x00u8, 0x1f, 0xab, 0xff];
         assert_eq!(hex_of(&b), "001fabff");
         assert_eq!(bytes_of_hex("001fabff").unwrap(), b);
+    }
+
+    #[test]
+    fn cert_payload_v2_parse() {
+        // 0x02 || len=5 || "abcde" || pub(65) || time(8) || serial(8)
+        let mut p = vec![0x02u8, 5];
+        p.extend_from_slice(b"abcde");
+        p.extend(std::iter::repeat(0x04u8).take(65));
+        p.extend(std::iter::repeat(0u8).take(16));
+        let (id, off) = parse_cert_payload(&p).unwrap();
+        assert_eq!(id, "abcde");
+        assert_eq!(off, 7);
+    }
+
+    #[test]
+    fn cert_payload_v1_parse() {
+        let mut p = vec![0x01u8];
+        p.extend(std::iter::repeat(0x04u8).take(65));
+        p.extend(std::iter::repeat(0u8).take(16));
+        let (id, off) = parse_cert_payload(&p).unwrap();
+        assert_eq!(id, "");
+        assert_eq!(off, 1);
     }
 }

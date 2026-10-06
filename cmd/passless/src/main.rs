@@ -635,9 +635,45 @@ fn run() -> Result<()> {
                             rpassword::prompt_password("ESP32 设备密码 (AUTHPASS): ")
                                 .map_err(|e| format!("读取密码失败: {e}"))
                         });
-                    let provider = esp32::Esp32CredentialKeyProvider::new(
+                    // 部署标识确认：展示证书内嵌的 deployment_id，让用户确认
+                    // “这是我自己部署的设备”。优先图形弹窗（zenity），回退终端 y/n。
+                    let deploy_confirm: Box<dyn Fn(&str) -> bool + Send + Sync> =
+                        Box::new(|deployment_id: &str| {
+                            let shown = if deployment_id.is_empty() {
+                                "(无 — 旧格式证书)"
+                            } else {
+                                deployment_id
+                            };
+                            let msg = format!(
+                                "设备已通过 CA 验证。\n\n部署标识（内嵌于证书）：\n{shown}\n\n这是你自己部署的设备吗？"
+                            );
+                            if let Ok(out) = std::process::Command::new("zenity")
+                                .args([
+                                    "--question",
+                                    "--title=确认设备归属",
+                                    "--ok-label=是我部署的",
+                                    "--cancel-label=不是，断开",
+                                    &format!("--text={msg}"),
+                                    "--timeout=120",
+                                ])
+                                .output()
+                            {
+                                if out.status.success() {
+                                    return true;
+                                }
+                                // zenity 可用但用户点了否/超时
+                                return false;
+                            }
+                            // 无图形环境：回退终端确认
+                            eprint!("{msg}\n[y/N] ");
+                            let mut line = String::new();
+                            std::io::stdin().read_line(&mut line).is_ok()
+                                && matches!(line.trim().to_ascii_lowercase().as_str(), "y" | "yes")
+                        });
+                    let provider = esp32::Esp32CredentialKeyProvider::new_with_deploy_prompt(
                         device_name,
                         Some(prompt),
+                        Some(deploy_confirm),
                     )
                     .map_err(Error::Other)?;
 
@@ -907,11 +943,42 @@ fn run() -> Result<()> {
                         rpassword::prompt_password("ESP32 设备密码 (AUTHPASS): ")
                             .map_err(|e| format!("读取密码失败: {e}"))
                     });
+                // 部署标识确认：展示证书内嵌的 deployment_id（对齐 web/authnkey）。
+                // 优先图形弹窗（zenity），回退终端 y/n。
+                let deploy_confirm: Box<dyn Fn(&str) -> bool + Send + Sync> =
+                    Box::new(|deployment_id: &str| {
+                        let shown = if deployment_id.is_empty() {
+                            "(无 — 旧格式证书)"
+                        } else {
+                            deployment_id
+                        };
+                        let msg = format!(
+                            "设备已通过 CA 验证。\n\n部署标识（内嵌于证书）：\n{shown}\n\n这是你自己部署的设备吗？"
+                        );
+                        if let Ok(out) = std::process::Command::new("zenity")
+                            .args([
+                                "--question",
+                                "--title=确认设备归属",
+                                "--ok-label=是我部署的",
+                                "--cancel-label=不是，断开",
+                                &format!("--text={msg}"),
+                                "--timeout=120",
+                            ])
+                            .output()
+                        {
+                            return out.status.success();
+                        }
+                        eprint!("{msg}\n[y/N] ");
+                        let mut line = String::new();
+                        std::io::stdin().read_line(&mut line).is_ok()
+                            && matches!(line.trim().to_ascii_lowercase().as_str(), "y" | "yes")
+                    });
                 // 方案 A1：凭证不落盘，storage 与 provider 共享同一条 BLE 连接。
-                let shared = esp32::Esp32Link::new_with_ca(
+                let shared = esp32::Esp32Link::new_full(
                     device_name,
                     Some(prompt),
                     config.esp32.ca_pubkey.clone(),
+                    Some(deploy_confirm),
                 )
                 .map_err(Error::Other)?;
                 let storage = storage::Esp32StorageAdapter::new(shared.clone());

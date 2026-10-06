@@ -63,8 +63,8 @@ pub struct Esp32BackendConfig {
     #[default(None::<String>)]
     pub device_name: Option<String>,
 
-    /// CA 公钥（P-256 未压缩点 base64，65 字节），用于验证设备证书与挑战响应。
-    /// 留空则使用内置默认值（与 web/totp.html 中 CA_PUBKEY_B64 一致）。
+    /// 根 CA 公钥（P-256 未压缩点 base64，65 字节），用于验证设备证书链与挑战响应。
+    /// 留空则使用内置默认值（与 web/totp.html 中 ROOT_CA_PUBKEY_B64 一致）。
     #[arg(
         long = "esp32-ca-pubkey",
         env = "PASSLESS_ESP32_CA_PUBKEY",
@@ -76,7 +76,7 @@ pub struct Esp32BackendConfig {
     pub ca_pubkey: Option<String>,
 }
 
-/// 内置默认 CA 公钥（与 tools/atri-ca.py 生成、web/totp.html 内置的同一条）。
+/// 内置默认根 CA 公钥（与 tools/atri-ca.py 生成、web/totp.html 内置的同一条）。
 pub const DEFAULT_ESP32_CA_PUBKEY_B64: &str =
     "BO+1Mjj2ZeglAd76ArgCaujE0FdBr+TURI6nlaMaAYAN7pZN04F3yhqzxGhDalco5cGMqSdVtgUT9Tu4iFbG9Q0=";
 
