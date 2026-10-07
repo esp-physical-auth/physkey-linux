@@ -943,7 +943,7 @@ fn run() -> Result<()> {
                         rpassword::prompt_password("ESP32 设备密码 (AUTHPASS): ")
                             .map_err(|e| format!("读取密码失败: {e}"))
                     });
-                // 部署标识确认：展示证书内嵌的 deployment_id（对齐 web/authnkey）。
+                // 部署标识确认：展示证书内嵌的 deployment_id（对齐 physkey-dashboard/authnkey）。
                 // 优先图形弹窗（zenity），回退终端 y/n。
                 let deploy_confirm: Box<dyn Fn(&str) -> bool + Send + Sync> =
                     Box::new(|deployment_id: &str| {

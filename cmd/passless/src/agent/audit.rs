@@ -32,7 +32,7 @@ use super::audit_events::{AuditEvent, DaemonRecoverBuilder, RecoveryReason};
 //     is therefore **outside the unkeyed threat model**.
 //   * The hashes detect accidental corruption, partial writes, and any
 //     modification that does not also rewrite every downstream hash.
-//   * The domain prefixes (`passless/audit/record/v1`, etc.) prevent
+//   * The domain prefixes (`physkey-linux/audit/record/v1`, etc.) prevent
 //     cross-context hash reuse between headers, records, and anchors.
 
 const AUDIT_DIR_MODE: u32 = 0o700;
@@ -47,9 +47,9 @@ const FRAME_OVERHEAD: usize = 8 + 8 + 8 + 4 + 32 + 32;
 const MAX_PAYLOAD_SIZE: u32 = 64 * 1024;
 const MAX_FRAME_SIZE: u64 = FRAME_OVERHEAD as u64 + MAX_PAYLOAD_SIZE as u64;
 const DEFAULT_MAX_SEGMENT_SIZE: u64 = 64 * 1024 * 1024;
-const HASH_DOMAIN: &str = "passless/audit/record/v1";
-const HEADER_DOMAIN: &str = "passless/audit/header/v1";
-const ANCHOR_DOMAIN: &str = "passless/audit/anchor/v1";
+const HASH_DOMAIN: &str = "physkey-linux/audit/record/v1";
+const HEADER_DOMAIN: &str = "physkey-linux/audit/header/v1";
+const ANCHOR_DOMAIN: &str = "physkey-linux/audit/anchor/v1";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AuditError {

@@ -64,7 +64,7 @@ A successful export is two-phase. Passless first prepares the encrypted bundle. 
 By default keys live under:
 
 ```text
-${XDG_CONFIG_HOME:-$HOME/.config}/passless/credential-backup-keys/
+${XDG_CONFIG_HOME:-$HOME/.config}/physkey-linux/credential-backup-keys/
 ```
 
 The directory can be overridden with `PASSLESS_CREDENTIAL_BACKUP_KEY_DIR`.
@@ -87,10 +87,10 @@ A key file must:
 Example provisioning:
 
 ```bash
-install -d -m 700 ~/.config/passless/credential-backup-keys
+install -d -m 700 ~/.config/physkey-linux/credential-backup-keys
 umask 077
-head -c 32 /dev/urandom > ~/.config/passless/credential-backup-keys/home-backup.key
-chmod 600 ~/.config/passless/credential-backup-keys/home-backup.key
+head -c 32 /dev/urandom > ~/.config/physkey-linux/credential-backup-keys/home-backup.key
+chmod 600 ~/.config/physkey-linux/credential-backup-keys/home-backup.key
 ```
 
 Copy that key to the corresponding protected key directory on the restore target using a secure out-of-band channel. Treat it as a high-value secret: possession of the wrapping key plus a backup bundle is sufficient to recover the exported passkey.

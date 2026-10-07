@@ -290,7 +290,7 @@ The profile's rules remain the authority source.
 ```toml
 [agents]
 enabled = true
-audit_path = "/var/lib/passless/agent-audit.jsonl"
+audit_path = "/var/lib/physkey-linux/agent-audit.jsonl"
 acknowledge_global_same_user = ["coding"]
 acknowledge_same_user_registration = ["enrollment"]
 ```

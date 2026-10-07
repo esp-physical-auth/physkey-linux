@@ -352,6 +352,18 @@ impl CredentialStorage for Esp32StorageAdapter {
             error!("[esp32-storage] WA_SETMETA 失败: {e:?}");
             soft_fido2::Error::Other
         })?;
+
+        // 双保险：注册路径（InternalId）只发了 WA_SETMETA，
+        // 补发 WA_SETMETA_WEB 让固件显式建立 webid→内部id 索引，
+        // 确保 WA_WEBMETA / WA_WEBSIGNHASH 能正确反查，
+        // 这样其他客户端（如 Android Authnkey）也能通过 webid 定位此凭据。
+        if matches!(locate, Locate::InternalId) {
+            let web_cmd = format!("WA_SETMETA_WEB {webid_b64} {kvs}\n");
+            if let Err(e) = self.shared.call(&web_cmd, true) {
+                warn!("[esp32-storage] WA_SETMETA_WEB 双保险失败（非致命）: {e:?}");
+            }
+        }
+
         Ok(())
     }
 

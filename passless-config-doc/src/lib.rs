@@ -156,7 +156,7 @@ fn generate_toml_method(
     // Header
     output_parts.push(quote! {
         output.push_str("# Passless Configuration File Example\n");
-        output.push_str("# Place this file at: ~/.config/passless/config.toml\n\n");
+        output.push_str("# Place this file at: ~/.config/physkey-linux/config.toml\n\n");
     });
 
     // Process fields

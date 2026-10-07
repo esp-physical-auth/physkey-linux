@@ -148,7 +148,7 @@ fn load_agent_config() -> Option<AgentConfig> {
     let config_path = std::env::var("PASSLESS_CONFIG")
         .ok()
         .map(PathBuf::from)
-        .or_else(|| dirs::config_dir().map(|p| p.join("passless/config.toml")))?;
+        .or_else(|| dirs::config_dir().map(|p| p.join("physkey-linux/config.toml")))?;
 
     if !config_path.exists() {
         return None;

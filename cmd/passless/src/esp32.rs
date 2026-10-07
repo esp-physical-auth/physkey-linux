@@ -82,7 +82,7 @@ pub struct Esp32Link {
     unlocked: Mutex<bool>,
     /// 根 CA 公钥（P-256 未压缩点 base64，65 字节），用于信任链校验。
     ca_pubkey_b64: String,
-    /// 部署标识确认回调（对齐 web/authnkey 的“这是你自己部署的设备吗”弹窗）。
+    /// 部署标识确认回调（对齐 physkey-dashboard/authnkey 的“这是你自己部署的设备吗”弹窗）。
     /// 返回 true = 用户确认；false/None = 拒绝（断开连接）。
     deploy_prompt: Mutex<Option<Box<dyn Fn(&str) -> bool + Send + Sync>>>,
     /// 最近一次验签通过的部署标识（内嵌于证书），供上层 UI 提示确认。
@@ -156,7 +156,7 @@ impl Esp32Link {
         Ok(link)
     }
 
-    /// 信任链校验（SSL/TLS 式三级链，全程离线，对齐 web/totp.html）：
+    /// 信任链校验（SSL/TLS 式三级链，全程离线，对齐 physkey-dashboard/totp.html）：
     ///   1. GETCERT 取设备证书链，用【内置根 CA 公钥】验签：
     ///      两段链：根CA公钥→验中间CA证书→取中间CA公钥→验设备证书
     ///      单段：直接用内置根 CA 公钥验设备证书
@@ -258,7 +258,7 @@ impl Esp32Link {
         // 供上层 UI 提示用户确认设备归属
         *self.deployment_id.lock().unwrap() = Some(deployment_id.clone());
 
-        // 1.5) 部署标识确认（对齐 web/authnkey：\"这是你自己部署的设备吗\"）
+        // 1.5) 部署标识确认（对齐 physkey-dashboard/authnkey：\"这是你自己部署的设备吗\"）
         //      在挑战-响应之前询问，拒绝则不继续。回调可能阻塞（弹窗），故
         //      先释放 deployment_id 锁再调用。
         let confirmed = {
@@ -497,7 +497,7 @@ impl BleLink {
     /// 收尾期间到达的字节同样要参与切行，绝不丢弃。
     async fn command(&self, cmd: &str) -> Result<String, String> {
         debug!("[esp32] >> {}", cmd);
-        // ESP32 端采用【长度前缀 + 分片】协议（同 web/totp.html）：
+        // ESP32 端采用【长度前缀 + 分片】协议（同 physkey-dashboard/totp.html）：
         //   命令体 = cmd + '\n'，前加 4 位十六进制长度（长度=命令体字节数）
         //   然后按 20 字节分片写入，避免超出 BLE MTU 导致 "Failed to initiate write"。
         let body = if cmd.ends_with('\n') {

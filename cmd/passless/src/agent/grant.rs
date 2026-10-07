@@ -1218,7 +1218,7 @@ mod tests {
 
     use sha2::{Digest, Sha256};
 
-    const PRINCIPAL_DIGEST_DOMAIN: &str = "passless/principal-digest/v1";
+    const PRINCIPAL_DIGEST_DOMAIN: &str = "physkey-linux/principal-digest/v1";
 
     fn compute_principal_digest(pid: u32, start_time_ticks: u64, cgroup: &str) -> [u8; 32] {
         let mut hasher = Sha256::new();

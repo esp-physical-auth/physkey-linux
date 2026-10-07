@@ -105,7 +105,7 @@ compatibility boundaries, and diagnostic procedures.
 
 ### Configuration File
 
-Passless reads its configuration from `~/.config/passless/config.toml`. No special permissions are
+Passless reads its configuration from `~/.config/physkey-linux/config.toml`. No special permissions are
 needed beyond standard user read access to the file.
 
 ### Pass Backend
@@ -429,7 +429,7 @@ journalctl --user -u passless -n 20
    `systemctl --user disable --now passless`.
 3. Multiple daemons are supported only when each uses a different backend state path.
 
-Lock files are stored in `$XDG_RUNTIME_DIR/passless/` (or `/tmp/passless-<uid>/passless/` as
+Lock files are stored in `$XDG_RUNTIME_DIR/physkey-linux/` (or `/tmp/passless-<uid>/physkey-linux/` as
 fallback). Stale lock files from crashed processes do not block restarts because lock ownership is
 attached to the file descriptor, not the file itself.
 

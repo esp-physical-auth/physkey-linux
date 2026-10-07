@@ -373,7 +373,7 @@ Agent processes communicate with the daemon via Unix socket IPC:
 
 ```rust
 // Agent process
-let stream = UnixStream::connect("/run/user/1000/passless/agent.sock")?;
+let stream = UnixStream::connect("/run/user/1000/physkey-linux/agent.sock")?;
 let mut client = AgentClient::new(stream);
 
 // Request delegation

@@ -154,17 +154,24 @@ systemctl status bluetooth
 ### 从源码编译
 
 ```bash
-git clone <this-repo> physkey-linux
-cd physkey-linux
+# 进入 workspace 根目录
+cd physkey-linux/
 
-# 编译（默认 feature 集，不含 agent / tpm）
-cargo build --release
+# 编译（默认 feature 集：ESP32 BLE 桥接，无 agent / tpm）
+cargo build --release -p passless-rs
 
-# 或带 agent 功能（策略控制的自动化认证）
-cargo build --release --features agent
+# 带 agent 功能（策略控制的自动化认证）
+cargo build --release -p passless-rs --features agent
+
+# 只编译核心协议库（Android JNI 集成用）
+cargo build --release -p esp32-fido-core --features jni
 ```
 
-**注意**：Rust 2024 edition 需要 Rust ≥ 1.85。
+**注意**：Rust 2024 edition 需要 Rust ≥ 1.85。如果编译 agent feature，需要额外依赖 `libdbus-1-dev`（`zbus` 运行时通过 BlueZ DBus 代理蓝牙交互）。
+
+编译产物位置：
+- 守护进程二进制：`target/release/passless`
+- ESP32 协议库：`target/release/libesp32_fido_core.so`（Android 交叉编译产物由 Gradle 任务负责，见 physkey-android README）
 
 ### 安装
 
@@ -184,7 +191,10 @@ make install-modules    # 自动加载 uhid 模块
 
 ```bash
 # 前台运行（调试用）
-passless
+cargo run -p passless-rs --release
+
+# 或直接运行已编译的二进制
+./target/release/passless
 
 # 作为 systemd user service
 systemctl --user enable --now passless
@@ -242,10 +252,10 @@ passless client list              # 列出设备上所有凭证
 
 ## 配置
 
-配置文件路径：`~/.config/passless/config.toml`
+配置文件路径：`~/.config/physkey-linux/config.toml`
 
 ```bash
-passless config print > ~/.config/passless/config.toml   # 生成默认模板
+passless config print > ~/.config/physkey-linux/config.toml   # 生成默认模板
 ```
 
 ### 完整示例

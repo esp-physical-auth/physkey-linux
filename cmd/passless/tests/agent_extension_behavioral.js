@@ -1479,7 +1479,7 @@ test("worker: bearer token with special characters is safely injected", async fu
 });
 
 test("worker: sends correct socket path in native message", async function() {
-  const sandbox = runWorkerTest("/var/run/passless/sign/sock", "tok", function(sandbox) {
+  const sandbox = runWorkerTest("/var/run/physkey-linux/sign/sock", "tok", function(sandbox) {
     sandbox._nativeMessageResponse = { body: "{}" };
 
     const listener = sandbox._listeners[0];
@@ -1501,7 +1501,7 @@ test("worker: sends correct socket path in native message", async function() {
   });
 
   await flushPromises();
-  assert.strictEqual(sandbox._nativeMessageCalls[0].message.socket_path, "/var/run/passless/sign/sock");
+  assert.strictEqual(sandbox._nativeMessageCalls[0].message.socket_path, "/var/run/physkey-linux/sign/sock");
   assert.strictEqual(sandbox._nativeMessageCalls[0].message.path, "/sign");
 });
 

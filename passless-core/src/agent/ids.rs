@@ -6,7 +6,7 @@ use sha2::{Digest, Sha256};
 
 const OPAQUE_ID_BYTES: usize = 32;
 const MAX_PROFILE_ID_LEN: usize = 128;
-const CREDENTIAL_REF_DOMAIN_SEPARATOR: &str = "passless/credential-ref/v1";
+const CREDENTIAL_REF_DOMAIN_SEPARATOR: &str = "physkey-linux/credential-ref/v1";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IdError {

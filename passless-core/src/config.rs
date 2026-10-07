@@ -27,7 +27,7 @@ use crate::error::Error;
 pub fn local_path() -> String {
     dirs::data_dir()
         .expect("Could not determine data directory: $XDG_DATA_HOME or $HOME/.local/share")
-        .join("passless/local")
+        .join("physkey-linux/local")
         .to_string_lossy()
         .into_owned()
 }
@@ -64,7 +64,7 @@ pub struct Esp32BackendConfig {
     pub device_name: Option<String>,
 
     /// 根 CA 公钥（P-256 未压缩点 base64，65 字节），用于验证设备证书链与挑战响应。
-    /// 留空则使用内置默认值（与 web/totp.html 中 ROOT_CA_PUBKEY_B64 一致）。
+    /// 留空则使用内置默认值（与 physkey-dashboard/totp.html 中 ROOT_CA_PUBKEY_B64 一致）。
     #[arg(
         long = "esp32-ca-pubkey",
         env = "PASSLESS_ESP32_CA_PUBKEY",
@@ -76,7 +76,7 @@ pub struct Esp32BackendConfig {
     pub ca_pubkey: Option<String>,
 }
 
-/// 内置默认根 CA 公钥（与 tools/atri-ca.py 生成、web/totp.html 内置的同一条）。
+/// 内置默认根 CA 公钥（与 tools/atri-ca.py 生成、physkey-dashboard/totp.html 内置的同一条）。
 pub const DEFAULT_ESP32_CA_PUBKEY_B64: &str =
     "BO+1Mjj2ZeglAd76ArgCaujE0FdBr+TURI6nlaMaAYAN7pZN04F3yhqzxGhDalco5cGMqSdVtgUT9Tu4iFbG9Q0=";
 
@@ -142,7 +142,7 @@ pub struct PassBackendConfig {
 pub fn tpm_path() -> String {
     dirs::data_dir()
         .expect("Could not determine data directory: $XDG_DATA_HOME or $HOME/.local/share")
-        .join("passless/tpm")
+        .join("physkey-linux/tpm")
         .to_string_lossy()
         .into_owned()
 }
@@ -663,7 +663,7 @@ impl BackendConfig {
 impl AppConfig {
     /// Load configuration with precedence: CLI > config file > defaults
     pub fn load(args: &mut Args) -> crate::error::Result<Self> {
-        let default_config_path = dirs::config_dir().map(|p| p.join("passless/config.toml"));
+        let default_config_path = dirs::config_dir().map(|p| p.join("physkey-linux/config.toml"));
 
         let config_file_path = args
             .config_path
@@ -2004,7 +2004,7 @@ mod tests {
         let toml_output = config.to_toml_with_comments();
 
         assert!(toml_output.contains("Passless Configuration File"));
-        assert!(toml_output.contains("~/.config/passless/config.toml"));
+        assert!(toml_output.contains("~/.config/physkey-linux/config.toml"));
     }
 
     #[test]

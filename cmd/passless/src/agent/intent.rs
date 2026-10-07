@@ -118,7 +118,7 @@ pub struct SessionIdentityParams {
 impl ProcessIdentityDigest {
     pub fn compute(uid: u32, gid: u32, pid: u32, exe_hash: &[u8]) -> Self {
         let mut hasher = Sha256::new();
-        hasher.update(b"passless/process-identity/v1");
+        hasher.update(b"physkey-linux/process-identity/v1");
         hasher.update(uid.to_le_bytes());
         hasher.update(gid.to_le_bytes());
         hasher.update(pid.to_le_bytes());
@@ -131,7 +131,7 @@ impl ProcessIdentityDigest {
 
     pub fn compute_from_session_identity(params: &SessionIdentityParams) -> Self {
         let mut hasher = Sha256::new();
-        hasher.update(b"passless/session-identity/v2\x00");
+        hasher.update(b"physkey-linux/session-identity/v2\x00");
         hasher.update(params.uid.to_le_bytes());
         hasher.update(params.gid.to_le_bytes());
         hasher.update((params.pid as u32).to_le_bytes());

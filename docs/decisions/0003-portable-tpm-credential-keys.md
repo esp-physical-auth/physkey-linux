@@ -4,10 +4,10 @@
 - **Date:** 2026-07-23
 - **Decision owners:** Passless maintainers
 - **Implementation status:** Complete (PR #354). Phases 1–4 and 6 implemented; remaining testing follow-ups tracked under [Phase 5 follow-ups](#phase-5-follow-ups)
-- **Implements:** [issue #314](https://github.com/pando85/passless/issues/314)
+- **Implements:** [issue #314](https://github.com/pando85/physkey-linux/issues/314)
 - **Depends on:** [soft-fido2 v0.15.0](https://github.com/pando85/soft-fido2/pull/126) (credential key-provider abstraction in the high-level `Authenticator`)
 - **Related documentation:** [TPM_PORTABLE.md](../TPM_PORTABLE.md), [TEE_HARDWARE_COMPATIBILITY.md](../TEE_HARDWARE_COMPATIBILITY.md)
-- **Background:** [discussion #312](https://github.com/pando85/passless/discussions/312), proof of concept [`mimi89999/webauthn_tpm_portable`](https://github.com/mimi89999/webauthn_tpm_portable)
+- **Background:** [discussion #312](https://github.com/pando85/physkey-linux/discussions/312), proof of concept [`mimi89999/webauthn_tpm_portable`](https://github.com/mimi89999/webauthn_tpm_portable)
 
 ## Context
 
@@ -398,11 +398,11 @@ The following testing items are **not done in PR #354** and are tracked as follo
 
 ## References
 
-- [issue #314 — refactor(tpm): use portable TPM-resident credential keys](https://github.com/pando85/passless/issues/314)
-- [discussion #312](https://github.com/pando85/passless/discussions/312)
+- [issue #314 — refactor(tpm): use portable TPM-resident credential keys](https://github.com/pando85/physkey-linux/issues/314)
+- [discussion #312](https://github.com/pando85/physkey-linux/discussions/312)
 - [proof of concept: mimi89999/webauthn_tpm_portable](https://github.com/mimi89999/webauthn_tpm_portable)
 - [soft-fido2 #126 — high-level key-provider API (v0.15.0)](https://github.com/pando85/soft-fido2/pull/126)
-- [passless PR #354 — portable TPM-resident credential key backend](https://github.com/pando85/passless/pull/354)
+- [passless PR #354 — portable TPM-resident credential key backend](https://github.com/pando85/physkey-linux/pull/354)
 - [TPM 2.0 Library Part 3: Commands, v185 — `TPM2_Import`](https://trustedcomputinggroup.org/wp-content/uploads/Trusted-Platform-Module-2.0-Library-Part-3-Commands_Version-185_pub.pdf)
 - [openssl-passphrase-options](https://www.openssl.org/docs/man3.0/man1/openssl-passphrase-options.html)
 - [Vault CLI usage](https://developer.hashicorp.com/vault/docs/commands)

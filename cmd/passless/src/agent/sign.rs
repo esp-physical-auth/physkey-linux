@@ -1476,6 +1476,30 @@ impl SignHandler {
             }
         }
 
+        // 兜底：本地存储没有覆盖 allowList 中的凭据时，
+        // 直接用 allowList 里的每个 webid 去 ESP32 读——这是跨客户端发现凭据的关键。
+        if candidates.is_empty() && !req.allow_credentials.is_empty() {
+            debug!("[sign] 本地存储无匹配凭据，尝试直接用 allowList webid 从 ESP32 读取");
+            for b64id in &req.allow_credentials {
+                let decoded = match b64u_decode(b64id) {
+                    Ok(d) => d,
+                    Err(_) => continue,
+                };
+                match storage.read(&decoded) {
+                    Ok(credential) => {
+                        if credential.extensions.cred_protect == Some(2) && !uv {
+                            continue;
+                        }
+                        debug!("[sign] allowList webid 命中 ESP32 凭据 id={}", b64id);
+                        candidates.push((decoded, CredentialRef::with_default_domain(b64id), credential.created));
+                    }
+                    Err(e) => {
+                        debug!("[sign] allowList webid={} 在 ESP32 上读失败: {:?}", b64id, e);
+                    }
+                }
+            }
+        }
+
         if candidates.is_empty() && !req.allow_credentials.is_empty() {
             self.record_policy_deny(
                 ctx,

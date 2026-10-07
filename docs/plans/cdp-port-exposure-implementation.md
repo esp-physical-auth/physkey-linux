@@ -282,7 +282,7 @@ use passless_core::agent::config::CdpExposeMode;
 
 ### Step 12: Update passless config for our deployment
 
-Update `~/.config/passless/config.toml` (and dotfiles):
+Update `~/.config/physkey-linux/config.toml` (and dotfiles):
 
 ```toml
 [agents.profiles.opencode]
@@ -291,7 +291,7 @@ principal_user = "agil"
 browser_cdp_expose = "port"
 browser_cdp_port = 9222
 browser_command = ["/usr/bin/chromium"]
-browser_runtime_root = "/home/agil/.local/share/passless/browser"
+browser_runtime_root = "/home/agil/.local/share/physkey-linux/browser"
 start_url = "https://github.com"
 credential_refs = [...]
 max_grant_ttl = 300

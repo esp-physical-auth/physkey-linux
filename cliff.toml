@@ -13,7 +13,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 # https://tera.netlify.app/docs/#introduction
 body = """
 {% if version %}\
-    ## [{{ version }}](https://github.com/pando85/passless/tree/{{ version }}) - {{ timestamp | date(format="%Y-%m-%d") }}
+    ## [{{ version }}](https://github.com/pando85/physkey-linux/tree/{{ version }}) - {{ timestamp | date(format="%Y-%m-%d") }}
 {% else %}\
     ## [unreleased]
 {% endif %}\
@@ -22,7 +22,7 @@ body = """
     {% for commit in commits
     | filter(attribute="scope")
     | sort(attribute="scope") %}
-        - {{commit.scope}}: {{ commit.message | upper_first }} ([{{commit.id | truncate(length=7, end="")}}](https://github.com/pando85/passless/commit/{{commit.id}}))
+        - {{commit.scope}}: {{ commit.message | upper_first }} ([{{commit.id | truncate(length=7, end="")}}](https://github.com/pando85/physkey-linux/commit/{{commit.id}}))
         {%- if commit.breaking %}
         {% raw %}  {% endraw %}- **BREAKING**: {{commit.breaking_description}}
         {%- endif -%}
@@ -30,7 +30,7 @@ body = """
     {% for commit in commits %}
         {%- if commit.scope %}
         {%- else %}
-            - {{ commit.message | upper_first }} ([{{commit.id | truncate(length=7, end="")}}](https://github.com/pando85/passless/commit/{{commit.id}}))
+            - {{ commit.message | upper_first }} ([{{commit.id | truncate(length=7, end="")}}](https://github.com/pando85/physkey-linux/commit/{{commit.id}}))
             {%- if commit.breaking %}
             {% raw %}  {% endraw %}- **BREAKING**: {{commit.breaking_description}}
             {%- endif -%}

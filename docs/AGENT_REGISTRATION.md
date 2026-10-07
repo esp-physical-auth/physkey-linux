@@ -51,7 +51,7 @@ Agent registration allows automated processes to create passkeys without human i
 
 ### Step 1: Define Agent Profile
 
-Create or update your agent profile in `~/.config/passless/config.toml`:
+Create or update your agent profile in `~/.config/physkey-linux/config.toml`:
 
 ```toml
 [profiles.ci-agent]

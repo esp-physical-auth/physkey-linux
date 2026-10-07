@@ -42,9 +42,9 @@
 │                              ↓                                               │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
 │  │  Storage Backend                                                     │   │
-│  │  - Local: JSON files in ~/.config/passless/fido2/                    │   │
+│  │  - Local: JSON files in ~/.config/physkey-linux/fido2/                    │   │
 │  │  - Pass: GPG-encrypted files in ~/.password-store/fido2/             │   │
-│  │  - TPM: TPM-sealed blobs in ~/.config/passless/tpm/                  │   │
+│  │  - TPM: TPM-sealed blobs in ~/.config/physkey-linux/tpm/                  │   │
 │  │  - TPM Portable: Portable parent at 0x81000001                       │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -208,7 +208,7 @@
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  Local Backend                                                              │
-│  ├─ Storage: ~/.config/passless/fido2/<rp_id>/<credential_id>.json         │
+│  ├─ Storage: ~/.config/physkey-linux/fido2/<rp_id>/<credential_id>.json         │
 │  ├─ Key material: Software scalar (soft_fido2_crypto)                       │
 │  ├─ Extractable: Yes (JSON file)                                            │
 │  └─ Security: File permissions only                                         │
@@ -220,13 +220,13 @@
 │  └─ Security: GPG encryption + file permissions                             │
 │                                                                             │
 │  TPM Backend                                                                │
-│  ├─ Storage: ~/.config/passless/tpm/<rp_id>/<credential_id>.tpm            │
+│  ├─ Storage: ~/.config/physkey-linux/tpm/<rp_id>/<credential_id>.tpm            │
 │  ├─ Key material: TPM-sealed blob (sealed by TPM owner hierarchy)           │
 │  ├─ Extractable: No (TPM-resident, requires same TPM to unseal)             │
 │  └─ Security: Hardware TPM, non-portable across machines                    │
 │                                                                             │
 │  TPM Portable Backend                                                       │
-│  ├─ Storage: ~/.config/passless/tpm-portable/<rp_id>/<credential_id>.tpm   │
+│  ├─ Storage: ~/.config/physkey-linux/tpm-portable/<rp_id>/<credential_id>.tpm   │
 │  ├─ Key material: Portable parent at 0x81000001 (swtpm or hardware)         │
 │  ├─ Extractable: No (TPM-resident, portable across machines with same TPM)  │
 │  └─ Security: Hardware TPM or swtpm, portable with parent key               │

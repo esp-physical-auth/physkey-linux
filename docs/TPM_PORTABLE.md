@@ -99,14 +99,14 @@ Equivalent environment variables:
 |---|---|
 | `PASSLESS_BACKEND_TYPE` | Must be `tpm` |
 | `PASSLESS_TPM_PORTABLE` | Set to `1` / `true` to enable portable mode |
-| `PASSLESS_TPM_PATH` | Storage directory (default: `~/.local/share/passless/tpm`) |
+| `PASSLESS_TPM_PATH` | Storage directory (default: `~/.local/share/physkey-linux/tpm`) |
 | `PASSLESS_TPM_TCTI` | TCTI connection string (default: `device:/dev/tpmrm0`) |
 
 TOML configuration:
 
 ```toml
 [tpm]
-path = "/home/user/.local/share/passless/tpm"
+path = "/home/user/.local/share/physkey-linux/tpm"
 tcti = "device:/dev/tpmrm0"
 portable = true
 ```

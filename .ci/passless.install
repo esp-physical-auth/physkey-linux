@@ -11,7 +11,7 @@ post_install() {
     echo ""
     echo "    Create a config directory and write the default config:"
     echo "      mkdir -p ~/.config/passless"
-    echo "      passless config print > ~/.config/passless/config.toml"
+    echo "      passless config print > ~/.config/physkey-linux/config.toml"
     echo ""
     echo "    Reload udev rules:"
     echo "      sudo udevadm control --reload-rules && sudo udevadm trigger"

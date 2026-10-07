@@ -12,9 +12,9 @@ depends=('gcc-libs')
 provides=("${_pkgname}")
 conflicts=("${_pkgname}")
 
-source=("https://github.com/pando85/passless/releases/download/v${pkgver}/passless-${pkgver}-${CARCH}-unknown-linux-gnu.tar.gz"
-        "passless-${pkgver}.tar.gz::https://github.com/pando85/passless/archive/refs/tags/v${pkgver}.tar.gz"
-        "https://github.com/pando85/passless/releases/download/v${pkgver}/passless-completions-${pkgver}.tar.gz"
+source=("https://github.com/pando85/physkey-linux/releases/download/v${pkgver}/passless-${pkgver}-${CARCH}-unknown-linux-gnu.tar.gz"
+        "passless-${pkgver}.tar.gz::https://github.com/pando85/physkey-linux/archive/refs/tags/v${pkgver}.tar.gz"
+        "https://github.com/pando85/physkey-linux/releases/download/v${pkgver}/passless-completions-${pkgver}.tar.gz"
         "passless.install")
 sha256sums=('{{ checksum }}'
             'SKIP'

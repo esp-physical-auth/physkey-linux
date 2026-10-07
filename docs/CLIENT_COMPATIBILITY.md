@@ -113,7 +113,7 @@ Flatpak/Snap policies, etc.).
 
 ### Reported Compatibility Issues
 
-A compatibility report in [discussion #294](https://github.com/pando85/passless/discussions/294)
+A compatibility report in [discussion #294](https://github.com/pando85/physkey-linux/discussions/294)
 describes passkey registration failing in Vesktop while the same Discord flow works in a regular
 browser.
 

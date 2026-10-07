@@ -1,0 +1,23 @@
+[package]
+name = "esp32-fido-core"
+edition.workspace = true
+version.workspace = true
+
+[features]
+default = []
+jni = ["dep:jni", "dep:serde", "dep:serde_json"]
+
+[dependencies]
+sha2 = { workspace = true }
+base64 = "0.22"
+p256 = { version = "0.13", features = ["ecdsa"] }
+thiserror = { workspace = true }
+rand = { workspace = true }
+hex = { workspace = true }
+
+jni = { version = "0.21", optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
+serde_json = { version = "1", optional = true }
+
+[lib]
+crate-type = ["lib", "cdylib"]

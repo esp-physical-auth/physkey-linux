@@ -244,7 +244,7 @@ Example easy same-user configuration:
 ```toml
 [agents]
 enabled = true
-audit_path = "/var/lib/passless/agent-audit.jsonl"
+audit_path = "/var/lib/physkey-linux/agent-audit.jsonl"
 
 [agents.profiles.opencode]
 mode = "same-user"

@@ -3,8 +3,8 @@
 - **Status:** Complete (PR #354 merged). Phases 1–4 and 6 implemented; Phase 5 follow-ups tracked below.
 - **Date:** 2026-07-23
 - **Owners:** Passless maintainers
-- **Covers:** [ADR 0003](../decisions/0003-portable-tpm-credential-keys.md); implements [issue #314](https://github.com/pando85/passless/issues/314)
-- **Branch / PR:** `feat/portable-tpm-backend` → [PR #354](https://github.com/pando85/passless/pull/354)
+- **Covers:** [ADR 0003](../decisions/0003-portable-tpm-credential-keys.md); implements [issue #314](https://github.com/pando85/physkey-linux/issues/314)
+- **Branch / PR:** `feat/portable-tpm-backend` → [PR #354](https://github.com/pando85/physkey-linux/pull/354)
 - **Execution model:** Orchestrator delegates coding to subagents (**max 2 parallel**), validates each result, then commits.
 
 ## Purpose

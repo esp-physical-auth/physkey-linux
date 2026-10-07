@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "cmd/passless",
+    "esp32-fido-core",
     "passless-config-doc",
     "passless-core",
     "passless-uhid",
