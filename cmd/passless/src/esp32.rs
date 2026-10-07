@@ -1,4 +1,4 @@
-//! ESP32-C5 BLE FIDO2 桥
+//! ESP32 BLE FIDO2 桥
 //!
 //! 把 passless / soft-fido2 的密钥操作转发给一台运行自定义 NUS 文本协议的
 //! ESP32 硬件。架构：
@@ -8,7 +8,7 @@
 //!   ↕ USB-HID (soft-fido2)
 //! passless (本模块)
 //!   ↕ BLE / Nordic UART Service (文本协议)
-//! ESP32-C5  (私钥永不导出，只负责生成与签名)
+//! ESP32  (私钥永不导出，只负责生成与签名)
 //! ```
 //!
 //! ESP32 端协议（NUS RX 写入指令，TX 通知返回，UTF-8 文本）：

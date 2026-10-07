@@ -4,7 +4,7 @@
   <br>
   physkey-linux
   <br>
-  <span style="font-size:0.7em;color:#888;">Passkey (FIDO2) · ESP32-C5 · 系统级接入</span>
+  <span style="font-size:0.7em;color:#888;">Passkey (FIDO2) · ESP32 · 系统级接入</span>
   <br><br>
 </h1>
 
@@ -12,7 +12,7 @@
 ![License](https://img.shields.io/badge/license-GPL%20v3-blue)
 ![Backend](https://img.shields.io/badge/backend-ESP32--C5--BLE-orange)
 
-**physkey-linux** 是一个把 **ESP32-C5 变成真正 FIDO2 硬件安全密钥** 的桥接守护进程。
+**physkey-linux** 是一个把 **ESP32 变成真正 FIDO2 硬件安全密钥** 的桥接守护进程。
 它在 Linux 内核里注册一个虚拟 UHID 设备，浏览器通过标准 USB-HID 通道看到一把合规的
 FIDO2 密钥；所有密钥生成和 P-256 签名操作则经 Nordic UART Service (NUS) 蓝牙协议，
 安全地转发给 ESP32 硬件执行——**私钥永不离开设备**。
@@ -23,7 +23,7 @@ FIDO2 密钥；所有密钥生成和 P-256 签名操作则经 Nordic UART Servic
 
 physkey-linux 不是软件模拟器：
 
-- **密钥生成、P-256 签名、凭证存储** 全部在 ESP32-C5 硬件内完成
+- **密钥生成、P-256 签名、凭证存储** 全部在 ESP32 硬件内完成
 - 主机上运行的是 **CTAP2 编解码器 + 蓝牙传输层**，永远看不到私钥
 - 通过 **CA 证书链 + 挑战响应** 防止蓝牙中间人攻击
 - 这把虚拟密钥对浏览器来说和 YubiKey、Solo 等硬件密钥无差别
@@ -61,7 +61,7 @@ TPM 级别的硬件密钥。
                          │ 蓝牙
                          ▼
           ┌─────────────────────────────┐
-          │  ESP32-C5 硬件              │
+          │  ESP32 硬件              │
           │  (私钥永不导出)             │
           │                             │
           │  WA_REG    密钥生成         │
@@ -203,7 +203,7 @@ journalctl --user -u passless -f
 
 ### ESP32 设备端
 
-需要一台烧录了 **FIDO2 NUS 固件** 的 ESP32-C5 / ESP32-C3 / ESP32-S3。
+需要一台烧录了 **FIDO2 NUS 固件** 的 ESP32 / ESP32-C3 / ESP32-S3。
 固件必须实现以下协议（Nordic UART Service，文本行协议）：
 
 ```

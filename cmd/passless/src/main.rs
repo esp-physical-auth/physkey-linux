@@ -596,7 +596,7 @@ fn run() -> Result<()> {
                 BackendConfig::Esp32 { device_name } => {
                     // ESP32 硬件后端：私钥永不导出，签名在设备上完成。
                     // 浏览器仍通过 UHID 看到虚拟安全密钥；CTAP2 编解码在本地，
-                    // 密钥生成/签名经由 BLE 转发给 ESP32-C5。
+                    // 密钥生成/签名经由 BLE 转发给 ESP32。
                     // 存储后端用本地目录（凭证的公开元信息仍缓存在本地）。
                     let storage = LocalStorageAdapter::new_with_options(
                         passless_core::config::local_path().into(),

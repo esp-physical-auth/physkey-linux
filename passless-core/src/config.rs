@@ -530,7 +530,7 @@ pub enum BackendConfig {
         tcti: String,
         portable: bool,
     },
-    /// ESP32-C5 硬件后端：密钥生成/签名经 BLE(NUS) 转发给设备。
+    /// ESP32 硬件后端：密钥生成/签名经 BLE(NUS) 转发给设备。
     Esp32 {
         device_name: Option<String>,
     },
